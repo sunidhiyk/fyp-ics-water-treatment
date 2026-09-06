@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Water-Treatment ICS — Operator Dashboard</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#c9d1d9; --dim:#8b949e;
+    --ok:#3fb950; --bad:#f85149; --accent:#58a6ff; --amber:#d29922; --cyan:#39c5cf;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:16px;padding:16px 24px;
+         border-bottom:1px solid var(--border);background:var(--panel)}
+  header h1{font-size:17px;margin:0;font-weight:600}
+  .status{margin-left:auto;display:flex;align-items:center;gap:10px;font-weight:600}
+  .dot{width:11px;height:11px;border-radius:50%;background:var(--ok);
+       box-shadow:0 0 8px var(--ok)}
+  .dot.bad{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  main{padding:24px;max-width:1180px;margin:0 auto}
+  .btns{display:flex;gap:10px;margin-bottom:20px}
+  button{background:var(--panel);color:var(--fg);border:1px solid var(--border);
+         padding:9px 16px;border-radius:7px;cursor:pointer;font-weight:600}
+  button.attack{border-color:var(--bad);color:var(--bad)}
+  button.attack:hover{background:rgba(248,81,73,.12)}
+  button.clear:hover{background:rgba(88,166,255,.12)}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--cyan);
+     margin:22px 0 12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+        padding:13px 15px;transition:border-color .2s}
+  .card.bad{border-color:var(--bad);background:rgba(248,81,73,.07)}
+  .card .tag{font-weight:700;font-size:13px}
+  .card .desc{color:var(--dim);font-size:11px;height:28px;overflow:hidden}
+  .card .val{font-size:24px;font-weight:700;margin-top:6px}
+  .card.bad .val{color:var(--bad)}
+  .card .band{color:var(--dim);font-size:11px;margin-top:2px}
+  .act{display:flex;align-items:center;gap:8px}
+  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid}
+  .pill.on{color:var(--ok);border-color:var(--ok)}
+  .pill.off{color:var(--dim);border-color:var(--border)}
+  .pill.trans{color:var(--amber);border-color:var(--amber)}
+  #alerts{margin-top:8px}
+  .alert{background:rgba(248,81,73,.1);border:1px solid var(--bad);color:#ffb3ae;
+         padding:10px 14px;border-radius:7px;margin-bottom:8px;font-weight:600}
+  .empty{color:var(--dim)}
+  footer{color:var(--dim);font-size:11px;padding:16px 24px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>💧 Water-Treatment ICS — Operator Dashboard</h1>
+  <div class="status"><span id="dot" class="dot"></span><span id="statusText">Normal</span></div>
+</header>
+<main>
+  <div class="btns">
+    <button class="attack" onclick="attack()">⚠ Inject attack (spoof LIT101)</button>
+    <button class="clear" onclick="clearAtk()">Clear</button>
+    <span class="empty" id="conn" style="align-self:center">connecting…</span>
+  </div>
+
+  <h2>Active Alerts</h2>
+  <div id="alerts"><div class="empty">No active alerts — process nominal.</div></div>
+
+  <h2>Sensors</h2>
+  <div class="grid" id="sensors"></div>
+
+  <h2>Actuators</h2>
+  <div class="grid" id="actuators"></div>
+</main>
+<footer>Live over Modbus TCP · demo slice of Phase 6 · protocol-aware DPI &amp; LSTM layers flag these automatically in later phases</footer>
+
+<script>
+let META = {sensors:[], actuators:[]};
+const metaByTag = {};
+const ACT = {0:["OFF","off"],1:["ON","on"],2:["TRANS","trans"]};
+
+async function loadMeta(){
+  META = await (await fetch("/api/meta")).json();
+  META.sensors.forEach(s => metaByTag[s.tag] = s);
+}
+function attack(){ fetch("/api/attack",{method:"POST"}); }
+function clearAtk(){ fetch("/api/clear",{method:"POST"}); }
+
+function render(d){
+  document.getElementById("conn").textContent = "● live";
+  // status
+  const bad = (d.alerts||[]).length>0 || d.attack;
+  document.getElementById("dot").className = "dot" + (bad?" bad":"");
+  document.getElementById("statusText").textContent =
+      d.attack ? "ATTACK IN PROGRESS" : (bad ? "Anomaly" : "Normal");
+
+  // alerts
+  const a = document.getElementById("alerts");
+  if(!d.alerts || d.alerts.length===0){
+    a.innerHTML = '<div class="empty">No active alerts — process nominal.</div>';
+  } else {
+    a.innerHTML = d.alerts.map(x =>
+      `<div class="alert">🚨 ${x.msg}</div>`).join("");
+  }
+
+  // sensors
+  document.getElementById("sensors").innerHTML = (d.sensors||[]).map(s=>{
+    const m = metaByTag[s.tag]||{unit:"",lo:0,hi:0,desc:""};
+    return `<div class="card ${s.ok?"":"bad"}">
+      <div class="tag">${s.tag}</div>
+      <div class="desc">${m.desc||""}</div>
+      <div class="val">${s.value}<span style="font-size:12px;color:var(--dim)"> ${m.unit}</span></div>
+      <div class="band">safe [${m.lo}..${m.hi}]</div></div>`;
+  }).join("");
+
+  // actuators
+  const am = {}; META.actuators.forEach(x=>am[x.tag]=x);
+  document.getElementById("actuators").innerHTML = (d.actuators||[]).map(x=>{
+    const [label,cls] = ACT[x.state]||["?","off"];
+    return `<div class="card"><div class="act">
+      <span class="pill ${cls}">${label}</span>
+      <div><div class="tag">${x.tag}</div>
+      <div class="desc">${(am[x.tag]||{}).desc||""}</div></div></div></div>`;
+  }).join("");
+}
+
+function connect(){
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = e => render(JSON.parse(e.data));
+  ws.onclose = () => { document.getElementById("conn").textContent="reconnecting…";
+                       setTimeout(connect,1500); };
+}
+loadMeta().then(connect);
+</script>
+</body>
+</html>

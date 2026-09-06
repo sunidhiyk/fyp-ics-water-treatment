@@ -1,0 +1,57 @@
+# Testbed orchestration for the water-treatment ICS security project.
+#
+# Phase 0/2 services are active now; detector/dashboard/ledger services are
+# added as their phases land. OpenPLC is included as the "real PLC" that can
+# drive actuators instead of the simulator's built-in soft-PLC.
+#
+# Usage:
+#   docker compose up plant postgres        # minimal testbed
+#   docker compose up                        # everything wired so far
+services:
+  # --- Plant simulator: exposes the process as Modbus TCP ------------------
+  plant:
+    build:
+      context: .
+      dockerfile: docker/plant.Dockerfile
+    command: ["python", "-m", "sim.modbus_server", "--host", "0.0.0.0", "--port", "5020", "--dt", "1.0"]
+    ports:
+      - "5020:5020"        # Modbus TCP (remove to keep OT traffic on the bridge only)
+    networks:
+      ot:
+        aliases: [plc-sim]
+
+  # --- OpenPLC soft-PLC runtime (real IEC 61131-3 control logic) -----------
+  # Drives the plant's actuators over Modbus when started with --no-control
+  # on the plant service. Web UI on :8080 to upload the ST program in plc/.
+  openplc:
+    image: fbarros/openplc:v3
+    profiles: ["plc"]      # opt-in: `docker compose --profile plc up`
+    ports:
+      - "8080:8080"
+    networks:
+      - ot
+    depends_on:
+      - plant
+
+  # --- PostgreSQL: alert + forensics store for the dashboard ---------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ics
+      POSTGRES_PASSWORD: ics_dev_pw
+      POSTGRES_DB: ics_security
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app
+
+networks:
+  ot:                       # OT segment: plant <-> PLC <-> HMI <-> capture tap
+    driver: bridge
+  app:                      # IT segment: detectors <-> db <-> dashboard
+    driver: bridge
+
+volumes:
+  pgdata:

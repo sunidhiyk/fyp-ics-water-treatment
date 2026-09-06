@@ -1,0 +1,24 @@
+# --- Core simulation & networking -------------------------------------------
+pymodbus==3.11.3          # Modbus TCP server/client (real OT protocol)
+scapy==2.6.1              # packet crafting for replay / injection / flooding attacks
+
+# --- Machine learning (Phase 5) ---------------------------------------------
+torch>=2.3               # LSTM / autoencoder sequence models
+numpy>=1.26
+pandas>=2.2
+scikit-learn>=1.5        # metrics, scaling, ROC
+
+# --- Backend / dashboard (Phase 6) ------------------------------------------
+fastapi>=0.115
+uvicorn[standard]>=0.30
+websockets>=13.0
+sqlalchemy>=2.0
+psycopg[binary]>=3.2     # PostgreSQL driver
+pydantic>=2.8
+
+# --- Ledger -----------------------------------------------------------------
+cryptography>=43.0       # signing for the hash-chain ledger
+
+# --- Tooling / tests --------------------------------------------------------
+pytest>=8.3
+python-dotenv>=1.0
