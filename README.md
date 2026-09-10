@@ -40,11 +40,28 @@ Plus an operator dashboard (FastAPI + PostgreSQL) and a quantitative evaluation
 |------|-----------|-------|
 | 0 | Repo scaffold, venv, docker-compose | **done** |
 | 2 | Plant physics + Modbus TCP server + soft-PLC | **done** |
-| 3 | Packet capture + labelled dataset generation | next |
-| 4 | Protocol-aware DPI rule engine | pending |
+| 3 | Traffic generation + labelled dataset | **done** |
+| 4 | Protocol-aware DPI rule engine | next |
 | 5 | LSTM detector + NetFlow/DoS monitor | pending |
 | 6 | Hash-chain ledger + dashboard | ledger pending; **live dashboard demo done** |
 | 7 | Attack suite + evaluation | pending |
+
+## Dataset generation (Phase 3)
+
+Generates a labelled dataset by running the plant with real HMI + attacker Modbus
+traffic and a schedule of five attack scenarios (false-data-injection, command
+injection, flooding/DoS, replay, stealth manipulation):
+
+```bash
+python -m net.generate_dataset --out-dir data/run1 --speedup 0
+```
+
+Produces `network_log.csv` (decoded Modbus transactions, for the DPI engine) and
+`device_log.csv` (per-second historian record, for the LSTM). Both carry a
+ground-truth `label` column. Schema and attack-class details in
+[`data/README.md`](data/README.md). The network log is captured at the
+application layer (equivalent to decoding a pcap); a real `tshark` pcap capture on
+the Docker bridge is an optional WSL/Linux path yielding the same schema.
 
 ## Web dashboard demo
 

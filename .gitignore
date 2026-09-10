@@ -1,8 +1,8 @@
 .venv/
 __pycache__/
 *.pyc
-data/*.pcap
-data/*.csv
+data/**/*.pcap
+data/**/*.csv
 data/public/*
 !data/public/.gitkeep
 *.pt
