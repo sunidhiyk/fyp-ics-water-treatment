@@ -11,3 +11,4 @@ data/public/*
 .pytest_cache/
 pgdata/
 demo/*.log
+detect/lstm/artifacts/

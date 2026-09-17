@@ -41,6 +41,7 @@ class Transaction:
     value_raw: int        # raw register value (writes; 0 for reads)
     count: int = 1        # number of registers in the request
     label: str = "normal"  # ground truth for training/eval
+    tick: int = -1        # dataset sim-second this transaction belongs to (windowing key)
 
     # -- derived (not stored as separate columns unless materialised) -------
     @property

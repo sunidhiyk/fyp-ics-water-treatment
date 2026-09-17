@@ -42,7 +42,7 @@ Plus an operator dashboard (FastAPI + PostgreSQL) and a quantitative evaluation
 | 2 | Plant physics + Modbus TCP server + soft-PLC | **done** |
 | 3 | Traffic generation + labelled dataset | **done** |
 | 4 | Protocol-aware DPI rule engine | **done** |
-| 5 | LSTM detector + NetFlow/DoS monitor | next |
+| 5 | LSTM detector + NetFlow/DoS monitor | **done** |
 | 6 | Hash-chain ledger + dashboard | ledger pending; **live dashboard demo done** |
 | 7 | Attack suite + evaluation | pending |
 
@@ -80,6 +80,43 @@ positives**, and deliberately passes flooding (→ NetFlow layer) and stealth (�
 LSTM layer) through — the detection-in-depth split. Engine in
 [`detect/dpi/engine.py`](detect/dpi/engine.py); shared alert type in
 [`detect/alert.py`](detect/alert.py).
+
+## LSTM anomaly detector + NetFlow monitor (Phase 5)
+
+The two layers that cover what the DPI rules cannot.
+
+**NetFlow/DoS monitor** — unsupervised volume detector. Learns the normal
+per-window request rate and flags any source that floods above it:
+
+```bash
+python -m detect.netflow.monitor --network-log data/run1/network_log.csv
+```
+Catches all flooding windows with 0 false positives.
+
+**LSTM autoencoder** — learns normal temporal patterns of the whole process from
+`device_log.csv`; a per-feature standardised reconstruction error flags windows
+that don't match normal behaviour. Crucially it catches the **stealth
+manipulation** (a compromised-HMI command that is protocol-valid, so the DPI layer
+cannot see it), and names the most abnormal signal:
+
+```bash
+python -m detect.lstm.train  --device-log data/run1/device_log.csv   # train on normal
+python -m detect.lstm.detect --device-log data/run1/device_log.csv   # score + report
+```
+On `data/run1`: detects all five attack classes with 0% false positives on normal
+windows. Model in [`detect/lstm/model.py`](detect/lstm/model.py).
+
+### Detection-in-depth coverage
+
+| Attack | DPI (Phase 4) | NetFlow (Phase 5) | LSTM (Phase 5) |
+|---|---|---|---|
+| false data injection | ✅ | | ✅ |
+| command injection | ✅ | | ✅ |
+| replay | ✅ | | ✅ |
+| flooding / DoS | | ✅ | (partial) |
+| stealth manipulation | | | ✅ |
+
+Every attack is covered by at least one layer — the point of the layered design.
 
 ## Web dashboard demo
 

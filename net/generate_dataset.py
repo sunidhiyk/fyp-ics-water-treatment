@@ -227,6 +227,7 @@ async def generate(out_dir: str, scenarios: list[str], speedup: float, seed: int
     try:
         for tick in range(duration):
             label = active_label(windows, tick)
+            tick_start = len(net_log)   # tag every transaction from this tick
 
             # 1. plant consumes actuator commands, advances one second
             for a in ACTUATORS:
@@ -246,6 +247,9 @@ async def generate(out_dir: str, scenarios: list[str], speedup: float, seed: int
                     replay_buf.append((t.register, t.value_raw))
             # 5. post-read attacker manipulation (writes / floods / replays)
             await attack_post_read(label, ctx, attacker, net_log, replay_buf, flood_n)
+            # stamp this tick onto every transaction generated during it
+            for t in net_log[tick_start:]:
+                t.tick = tick
             # 6. historian row (reported values + final actuator states)
             device_rows.append(device_row(ctx, tick, label))
 

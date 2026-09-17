@@ -111,5 +111,5 @@ def load_network_log(path: str) -> Iterator[Transaction]:
                 dst_port=int(row["dst_port"]), unit_id=int(row["unit_id"]),
                 func_code=int(row["func_code"]), register=int(row["register"]),
                 value_raw=int(row["value_raw"]), count=int(row["count"]),
-                label=row["label"],
+                label=row["label"], tick=int(row.get("tick", -1)),
             )
