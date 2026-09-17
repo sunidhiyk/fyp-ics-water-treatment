@@ -43,8 +43,27 @@ Plus an operator dashboard (FastAPI + PostgreSQL) and a quantitative evaluation
 | 3 | Traffic generation + labelled dataset | **done** |
 | 4 | Protocol-aware DPI rule engine | **done** |
 | 5 | LSTM detector + NetFlow/DoS monitor | **done** |
-| 6 | Hash-chain ledger + dashboard | ledger pending; **live dashboard demo done** |
-| 7 | Attack suite + evaluation | pending |
+| 6 | Hash-chain ledger + correlator + dashboard | **done** |
+| 7 | Attack suite + evaluation | next |
+
+## Tamper-evident ledger + correlator (Phase 6)
+
+**Correlator** ([`detect/correlator/`](detect/correlator/correlator.py)) merges the
+three detectors into one incident stream and writes every control command and
+alert to the ledger. Run the whole pipeline (coverage table + ledger + tamper
+demo):
+
+```bash
+python -m detect.correlator.run
+```
+
+**Hash-chain ledger** ([`ledger/hashchain.py`](ledger/hashchain.py)) — an
+append-only, signed audit trail behind a [`LedgerBackend`](ledger/backend.py)
+interface (so Hyperledger Fabric can drop in later). Each entry chains to the
+previous by SHA-256 and is signed with Ed25519; `verify()` detects and localises
+any edit, deletion, reordering, or forged signature. The live dashboard shows the
+ledger with an INTACT/COMPROMISED badge and a **Tamper with log** button that
+demonstrates detection in the browser.
 
 ## Dataset generation (Phase 3)
 

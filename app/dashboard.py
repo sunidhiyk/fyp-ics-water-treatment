@@ -30,9 +30,12 @@ from fastapi.responses import HTMLResponse
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.server import StartAsyncTcpServer, ServerAsyncStop
 
+import time
+
 from sim.plant import Plant
 from sim.modbus_server import build_context, physics_loop, control_loop
 from sim.register_map import SENSORS, ACTUATORS, BY_TAG, REGISTER_COUNT
+from ledger.hashchain import HashChainLedger
 
 MODBUS_HOST, MODBUS_PORT = "127.0.0.1", 5020
 
@@ -40,11 +43,21 @@ app = FastAPI(title="Water-Treatment ICS Dashboard")
 
 # shared runtime state
 _clients: set[WebSocket] = set()
-_latest: dict = {"sensors": [], "actuators": [], "alerts": [], "attack": False}
+_latest: dict = {"sensors": [], "actuators": [], "alerts": [], "attack": False,
+                 "ledger": {"count": 0, "intact": True, "broken_index": None}}
 _client: AsyncModbusTcpClient | None = None
 _tasks: list[asyncio.Task] = []
 _attack_active = False
 _spoof_task: asyncio.Task | None = None
+
+# tamper-evident audit trail (in-memory: resets each run)
+_ledger = HashChainLedger()
+_alerted_tags: set[str] = set()   # tags currently in an alerted state (edge-detect)
+
+
+def _ledger_summary() -> dict:
+    r = _ledger.verify()
+    return {"count": len(_ledger), "intact": r.ok, "broken_index": r.broken_index}
 
 
 def _meta() -> dict:
@@ -79,8 +92,17 @@ async def _poller() -> None:
                 actuators = [{"tag": p.tag,
                               "state": int(round(BY_TAG[p.tag].to_physical(regs[p.address])))}
                              for p in ACTUATORS]
+                # append each NEWLY-alerting sensor to the tamper-evident ledger
+                current = {a["tag"] for a in alerts}
+                for a in alerts:
+                    if a["tag"] not in _alerted_tags:
+                        _ledger.append({"type": "alert", "ts": time.time(),
+                                        "tag": a["tag"], "message": a["msg"]})
+                _alerted_tags.clear()
+                _alerted_tags.update(current)
                 _latest.update(sensors=sensors, actuators=actuators,
-                               alerts=alerts, attack=_attack_active)
+                               alerts=alerts, attack=_attack_active,
+                               ledger=_ledger_summary())
                 await _broadcast(_latest)
         except Exception:  # keep the demo alive across transient client hiccups
             pass
@@ -153,6 +175,9 @@ async def inject_attack() -> dict:
     if _client is not None and _spoof_task is None:
         _spoof_task = asyncio.create_task(_hold_spoof("LIT101", 1180.0))
         _attack_active = True
+        _ledger.append({"type": "control_command", "ts": time.time(),
+                        "src": "10.0.0.66", "tag": "LIT101", "value": 1180.0,
+                        "note": "operator-triggered demo: spoof write to LIT101"})
     return {"ok": True}
 
 
@@ -171,6 +196,31 @@ async def clear_attack() -> dict:
 @app.get("/api/meta")
 async def meta() -> dict:
     return _meta()
+
+
+@app.get("/api/ledger")
+async def get_ledger() -> dict:
+    """Return recent ledger entries and the current integrity status."""
+    r = _ledger.verify()
+    entries = _ledger.entries()[-12:]     # last few for display
+    view = [{"index": e["index"], "type": e["payload"].get("type", "?"),
+             "summary": e["payload"].get("message") or e["payload"].get("note")
+             or f'{e["payload"].get("tag","")}={e["payload"].get("value","")}',
+             "entry_hash": e["entry_hash"][:12]} for e in entries]
+    return {"integrity": {"intact": r.ok, "broken_index": r.broken_index,
+                          "reason": r.reason, "count": r.length},
+            "entries": view}
+
+
+@app.post("/api/tamper")
+async def tamper() -> dict:
+    """Demo: forge a stored ledger entry so integrity verification fails."""
+    if len(_ledger) == 0:
+        return {"ok": False, "reason": "ledger empty"}
+    victim = min(1, len(_ledger) - 1)
+    _ledger._entries[victim]["payload"]["value"] = 0.0
+    _ledger._entries[victim]["payload"]["note"] = "record silently altered by attacker"
+    return {"ok": True, "tampered_index": victim}
 
 
 @app.websocket("/ws")

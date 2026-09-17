@@ -12,3 +12,8 @@ data/public/*
 pgdata/
 demo/*.log
 detect/lstm/artifacts/
+
+# generated datasets, ledgers, and keys (regenerate locally)
+data/run*/
+*.pem
+*.jsonl

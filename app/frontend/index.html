@@ -64,6 +64,25 @@
   <h2>Active Alerts</h2>
   <div id="alerts"><div class="empty">No active alerts — process nominal.</div></div>
 
+  <h2>Audit Ledger <span style="text-transform:none;color:var(--dim)">— tamper-evident (hash-chain + Ed25519)</span></h2>
+  <div class="card" style="margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <span id="ledgerBadge" class="pill on">INTACT</span>
+      <span id="ledgerCount" class="desc">0 entries</span>
+      <span style="margin-left:auto;display:flex;gap:8px">
+        <button class="attack" onclick="tamper()">🗝 Tamper with log</button>
+        <button class="clear" onclick="refreshLedger()">Refresh</button>
+      </span>
+    </div>
+    <div id="ledgerBreak" class="alert" hidden></div>
+    <table style="width:100%;margin-top:10px;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--dim);text-align:left">
+        <th style="padding:4px 6px">#</th><th>type</th><th>entry</th><th>hash</th>
+      </tr></thead>
+      <tbody id="ledgerRows"></tbody>
+    </table>
+  </div>
+
   <h2>Sensors</h2>
   <div class="grid" id="sensors"></div>
 
@@ -81,8 +100,30 @@ async function loadMeta(){
   META = await (await fetch("/api/meta")).json();
   META.sensors.forEach(s => metaByTag[s.tag] = s);
 }
-function attack(){ fetch("/api/attack",{method:"POST"}); }
+function attack(){ fetch("/api/attack",{method:"POST"}).then(()=>setTimeout(refreshLedger,300)); }
 function clearAtk(){ fetch("/api/clear",{method:"POST"}); }
+function tamper(){ fetch("/api/tamper",{method:"POST"}).then(refreshLedger); }
+
+async function refreshLedger(){
+  const d = await (await fetch("/api/ledger")).json();
+  const badge = document.getElementById("ledgerBadge");
+  const brk = document.getElementById("ledgerBreak");
+  document.getElementById("ledgerCount").textContent = d.integrity.count + " entries";
+  if(d.integrity.intact){
+    badge.className = "pill on"; badge.textContent = "INTACT";
+    brk.hidden = true;
+  } else {
+    badge.className = "pill"; badge.style.color = "var(--bad)";
+    badge.style.borderColor = "var(--bad)"; badge.textContent = "COMPROMISED";
+    brk.hidden = false;
+    brk.textContent = `⛔ Tampering detected at entry ${d.integrity.broken_index}: ${d.integrity.reason}`;
+  }
+  document.getElementById("ledgerRows").innerHTML = d.entries.map(e=>
+    `<tr style="border-top:1px solid var(--border)">
+       <td style="padding:4px 6px;color:var(--dim)">${e.index}</td>
+       <td>${e.type}</td><td>${e.summary}</td>
+       <td style="font-family:monospace;color:var(--dim)">${e.entry_hash}…</td></tr>`).join("");
+}
 
 function render(d){
   document.getElementById("conn").textContent = "● live";
@@ -111,6 +152,13 @@ function render(d){
       <div class="band">safe [${m.lo}..${m.hi}]</div></div>`;
   }).join("");
 
+  // ledger badge live from the broadcast (full detail via refreshLedger)
+  if(d.ledger){
+    const badge=document.getElementById("ledgerBadge");
+    document.getElementById("ledgerCount").textContent=d.ledger.count+" entries";
+    if(d.ledger.intact){ badge.className="pill on"; badge.textContent="INTACT"; }
+  }
+
   // actuators
   const am = {}; META.actuators.forEach(x=>am[x.tag]=x);
   document.getElementById("actuators").innerHTML = (d.actuators||[]).map(x=>{
@@ -128,7 +176,8 @@ function connect(){
   ws.onclose = () => { document.getElementById("conn").textContent="reconnecting…";
                        setTimeout(connect,1500); };
 }
-loadMeta().then(connect);
+loadMeta().then(connect).then(refreshLedger);
+setInterval(refreshLedger, 5000);   // keep the ledger view fresh
 </script>
 </body>
 </html>
