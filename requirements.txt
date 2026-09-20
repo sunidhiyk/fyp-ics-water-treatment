@@ -8,6 +8,12 @@ numpy>=1.26
 pandas>=2.2
 scikit-learn>=1.5        # metrics, scaling, ROC
 
+# --- Evaluation & demos (Phase 7 / demo) ------------------------------------
+matplotlib>=3.8          # ablation + per-class recall plots
+pillow>=10.0             # demo GIF rendering
+imageio>=2.34            # demo MP4 rendering
+imageio-ffmpeg>=0.5      # bundled ffmpeg for MP4
+
 # --- Backend / dashboard (Phase 6) ------------------------------------------
 fastapi>=0.115
 uvicorn[standard]>=0.30

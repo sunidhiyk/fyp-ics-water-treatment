@@ -44,7 +44,7 @@ Plus an operator dashboard (FastAPI + PostgreSQL) and a quantitative evaluation
 | 4 | Protocol-aware DPI rule engine | **done** |
 | 5 | LSTM detector + NetFlow/DoS monitor | **done** |
 | 6 | Hash-chain ledger + correlator + dashboard | **done** |
-| 7 | Attack suite + evaluation | next |
+| 7 | Attack suite + evaluation + ablation | **done** |
 
 ## Tamper-evident ledger + correlator (Phase 6)
 
@@ -136,6 +136,20 @@ windows. Model in [`detect/lstm/model.py`](detect/lstm/model.py).
 | stealth manipulation | | | ✅ |
 
 Every attack is covered by at least one layer — the point of the layered design.
+
+## Evaluation & ablation (Phase 7)
+
+Scores each layer and the combined system (precision / recall / FPR / F1,
+per-class recall, detection latency) and writes plots + JSON:
+
+```bash
+python -m eval.evaluate     # -> eval/results/{ablation.png, per_class_recall.png, results.json}
+```
+
+Headline result on `data/run1`: the **combined** system reaches **0.91 recall /
+0.96 precision** and detects every attack within **1 second**, while no single
+layer exceeds 0.60 recall — quantifying the value of the layered design. Full
+numbers and methodology in [`docs/results.md`](docs/results.md).
 
 ## Web dashboard demo
 
