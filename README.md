@@ -146,10 +146,29 @@ per-class recall, detection latency) and writes plots + JSON:
 python -m eval.evaluate     # -> eval/results/{ablation.png, per_class_recall.png, results.json}
 ```
 
-Headline result on `data/run1`: the **combined** system reaches **0.91 recall /
-0.96 precision** and detects every attack within **1 second**, while no single
-layer exceeds 0.60 recall — quantifying the value of the layered design. Full
-numbers and methodology in [`docs/results.md`](docs/results.md).
+Headline result on `data/run1` (our simulator): the **combined** system reaches
+**0.91 recall / 0.96 precision** and detects every attack within **1 second**,
+while no single layer exceeds 0.60 recall — quantifying the value of the layered
+design. Full numbers and methodology in [`docs/results.md`](docs/results.md).
+These are simulator results; see the external validation below for how the LSTM
+layer holds up on real data.
+
+## External validation on the public HAI dataset
+
+To test generalisation beyond our own data, the LSTM detector was trained and
+tested on **HAI 22.04**, a real hardware-in-the-loop ICS testbed with labelled
+attacks (~1% of the time):
+
+```bash
+python -m eval.hai_validate     # needs data/public/hai/{train1,test1}.csv
+```
+
+The approach transfers only **weakly**: ROC-AUC **0.74** (clearly above chance),
+but PR-AUC is 0.04–0.08 and even an oracle-calibrated threshold gives F1 ≤ 0.10.
+The main cause is operating-mode drift between HAI's training and test days,
+which the model mistakes for attacks. The simulator results should therefore be
+read as optimistic. Full results, diagnosis, and future work in
+[`docs/hai_validation.md`](docs/hai_validation.md).
 
 ## Web dashboard demo
 
