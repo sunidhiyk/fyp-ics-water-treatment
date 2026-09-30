@@ -41,9 +41,11 @@ are covered by another:
   see it; the NetFlow volume monitor catches it.
 - **Stealth** is a protocol-valid command from the authorised HMI address, so DPI
   cannot flag it; the LSTM catches the abnormal process behaviour it causes.
-- **Replay** re-sends a legitimate command, so the process behaves normally and
-  the LSTM sees nothing; DPI catches it because it comes from an unauthorised
-  source.
+- **Replay** re-sends the controller's most recent legitimate command. That
+  command already matches what the controller wants, so the process behaves
+  normally and the LSTM sees nothing; DPI catches it because it comes from an
+  unauthorised source. (Replaying an old, out-of-context command would disturb
+  the process; this scenario does not test that.)
 
 ## Detection latency (seconds to first alert)
 

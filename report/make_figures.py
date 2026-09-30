@@ -65,7 +65,7 @@ def architecture() -> str:
     box(ax, 69, 32, 97, 40, "Network log", "decoded Modbus transactions", "log")
     arrow(ax, 17, 51.4, 17, 40.6)
     arrow(ax, 64, 57, 83, 40.6)
-    ax.text(76.5, 49, "tap", fontsize=8.5, color="#555555", style="italic")
+    ax.text(74.5, 49, "request log", fontsize=8.5, color="#555555", style="italic")
 
     # --- detection layer --------------------------------------------------
     box(ax, 3, 17, 31, 25.5, "LSTM autoencoder", "stealthy / unseen behaviour", "lstm")
@@ -136,7 +136,7 @@ def dataset_timeline(device_log: str = "data/run1/device_log.csv") -> str:
     axes[2].step(t, [v + 1.3 for v in p203], where="post", color="#b7791f", lw=1.2,
                  label="P203 acid pump (offset)")
     axes[2].set_yticks([0, 1, 1.3, 2.3]); axes[2].set_yticklabels(["off", "on", "off", "on"])
-    axes[2].set_ylabel("pump state"); axes[2].legend(loc="center right", fontsize=7.5)
+    axes[2].set_ylabel("pump state"); axes[2].legend(loc="upper left", fontsize=7.5)
     axes[2].set_xlabel("time (s)")
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     p = os.path.join(OUT, "dataset_timeline.png")

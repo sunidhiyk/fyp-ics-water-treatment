@@ -10,28 +10,29 @@ simulated multi-stage water-treatment plant. Combines three cooperating layers:
 3. **Tamper-evident ledger** — a signed hash-chain (Hyperledger Fabric optional)
    giving a forensic, tamper-evident audit trail of every command and alert.
 
-Plus an operator dashboard (FastAPI + PostgreSQL) and a quantitative evaluation
+Plus an operator dashboard (FastAPI + WebSocket) and a quantitative evaluation
 (precision / recall / FPR / detection latency) against single-layer baselines.
 
-> **No physical hardware.** The plant is a Python physics model driving a real
-> **Modbus TCP** network on a Docker bridge, so the packets the DPI layer
-> inspects are genuine. See `docs/` for the protocol-substitution rationale
-> (Modbus in place of ENIP/CIP) and the full plan.
+> **No physical hardware.** The plant is a Python physics model that exchanges
+> real **Modbus TCP** traffic with a Python controller and an attacker over local
+> TCP connections. The DPI layer inspects a log of those requests, written by the
+> traffic generator with the fields a packet decoder would extract (a `tshark`
+> packet capture was not implemented). See `docs/` for the protocol-substitution
+> rationale (Modbus in place of ENIP/CIP).
 
 ## Architecture
 
 ```
-[ Python physics sim ] <--registers--> [ soft-PLC / OpenPLC control logic ]
-        |                                          |
-        +------------ Modbus TCP (Docker bridge, SPAN tap = tshark) ---------+
-             |                    |                      |
-      [ Rule DPI ]        [ LSTM detector ]      [ NetFlow/DoS monitor ]
-             \                    |                      /
-              +--------> [ correlator / alert bus ] <---+
-                                  |
-                       [ hash-chain ledger ] --(optional)--> [ Fabric ]
-                                  |
-                    [ FastAPI + PostgreSQL + WebSocket dashboard ]
+[ Python plant simulator ] <--- Modbus TCP ---> [ Python controller (HMI) ]
+                                   ^
+                                   |  [ attacker ]
+        device log (1 Hz)          |  network log (every request, decoded)
+               |                   |          |
+       [ LSTM detector ]    [ Rule DPI ]   [ NetFlow/DoS monitor ]
+               \                   |          /
+                +------> [ correlator ] <----+
+                         |              |
+          [ hash-chain ledger ]   [ FastAPI + WebSocket dashboard ]
 ```
 
 ## Status
@@ -78,9 +79,10 @@ python -m net.generate_dataset --out-dir data/run1 --speedup 0
 Produces `network_log.csv` (decoded Modbus transactions, for the DPI engine) and
 `device_log.csv` (per-second historian record, for the LSTM). Both carry a
 ground-truth `label` column. Schema and attack-class details in
-[`data/README.md`](data/README.md). The network log is captured at the
-application layer (equivalent to decoding a pcap); a real `tshark` pcap capture on
-the Docker bridge is an optional WSL/Linux path yielding the same schema.
+[`data/README.md`](data/README.md). The network log is written by the generator
+itself, which records each Modbus request it sends with the fields a packet
+decoder would extract. Capturing the frames with `tshark` and decoding the pcap
+would give the same schema but was not implemented.
 
 ## Protocol-aware DPI rule engine (Phase 4)
 
@@ -206,28 +208,28 @@ python -m venv .venv
 .venv\Scripts\python -m pytest -q
 ```
 
-## Run the testbed with Docker
+## Docker (prepared, not used by the experiments)
 
-```bash
-docker compose up plant postgres          # plant on :5020, Postgres on :5432
-docker compose --profile plc up           # add OpenPLC (drive plant with --no-control)
-```
-
-To hand actuator control to OpenPLC instead of the built-in soft-PLC, start the
-plant with `--no-control` and upload the Structured Text program from `plc/`.
+`docker-compose.yml` defines the plant service plus optional OpenPLC and
+PostgreSQL services that were set up for future work. None of the experiments
+use them: control is done by the Python controller, the ledger is kept in memory
+or a JSON-lines file, and no OpenPLC program has been written yet (`plc/` is
+empty). The plant's `--no-control` flag is there so an external PLC can take
+over the actuators later.
 
 ## Layout
 
 ```
 sim/       plant physics (plant.py), register map (register_map.py), Modbus server
-plc/       OpenPLC Structured Text control programs
-net/       tshark capture + Scapy attack scripts (replay / FDI / flood)
+net/       actors, attack scenarios, transaction schema, dataset generator
 detect/    dpi/ (rule engine)  lstm/ (sequence model)  netflow/  correlator/
-ledger/    LedgerBackend interface, HashChainLedger, FabricLedger (stretch)
+ledger/    LedgerBackend interface and HashChainLedger
 app/       FastAPI backend + WebSocket dashboard
-data/      generated datasets + pcaps (gitignored) ; public datasets under data/public
-eval/      metrics, ablation, plots
-docs/      architecture + protocol-substitution rationale + results
+eval/      metrics, ablation, HAI validation, plots
+report/    figure generator and figures for the final report
+demo/      demo GIF / video generators
+data/      generated datasets (gitignored); public datasets under data/public
+docs/      protocol-substitution rationale, results, HAI validation
 tests/     pytest suite
 ```
 
