@@ -17,3 +17,4 @@ detect/lstm/artifacts/
 data/run*/
 *.pem
 *.jsonl
+node_modules/

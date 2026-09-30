@@ -276,7 +276,7 @@ def main() -> None:
     ax.set_yscale("log")
     ax.set_xlabel("time in test set (hours)"); ax.set_ylabel("score (log)")
     ax.set_title(f"HAI {os.path.basename(args.test)} - LSTM score vs real attacks "
-                 f"(shaded); trained on {len(train_paths)} day(s)")
+                 f"(shaded); trained on {len(train_paths)} recording(s)")
     ax.legend(loc="upper right", fontsize=8); fig.tight_layout()
     p = os.path.join(args.out_dir, f"hai_timeline{sfx}.png")
     fig.savefig(p, dpi=130); plt.close(fig)

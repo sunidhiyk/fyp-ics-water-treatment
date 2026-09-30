@@ -1,0 +1,274 @@
+[
+ {
+  "tag": "LIT101",
+  "addr": 0,
+  "kind": "sensor",
+  "stage": "intake",
+  "unit": "mm",
+  "lo": 250,
+  "hi": 1100,
+  "desc": "Raw water tank level",
+  "states": null
+ },
+ {
+  "tag": "FIT101",
+  "addr": 1,
+  "kind": "sensor",
+  "stage": "intake",
+  "unit": "m3/h",
+  "lo": 0.0,
+  "hi": 3.0,
+  "desc": "Raw water inflow rate",
+  "states": null
+ },
+ {
+  "tag": "MV101",
+  "addr": 5,
+  "kind": "actuator",
+  "stage": "intake",
+  "unit": "state",
+  "lo": 0,
+  "hi": 2,
+  "desc": "Motorised inlet valve",
+  "states": [
+   0,
+   1,
+   2
+  ]
+ },
+ {
+  "tag": "P101",
+  "addr": 6,
+  "kind": "actuator",
+  "stage": "intake",
+  "unit": "state",
+  "lo": 0,
+  "hi": 1,
+  "desc": "Raw water transfer pump",
+  "states": [
+   0,
+   1
+  ]
+ },
+ {
+  "tag": "AIT201",
+  "addr": 10,
+  "kind": "sensor",
+  "stage": "chemical dosing",
+  "unit": "uS/cm",
+  "lo": 100,
+  "hi": 300,
+  "desc": "Conductivity after dosing",
+  "states": null
+ },
+ {
+  "tag": "AIT202",
+  "addr": 11,
+  "kind": "sensor",
+  "stage": "chemical dosing",
+  "unit": "pH",
+  "lo": 6.5,
+  "hi": 8.5,
+  "desc": "pH after chemical dosing",
+  "states": null
+ },
+ {
+  "tag": "FIT201",
+  "addr": 12,
+  "kind": "sensor",
+  "stage": "chemical dosing",
+  "unit": "m3/h",
+  "lo": 0.0,
+  "hi": 3.0,
+  "desc": "Dosing stage flow",
+  "states": null
+ },
+ {
+  "tag": "P201",
+  "addr": 15,
+  "kind": "actuator",
+  "stage": "chemical dosing",
+  "unit": "state",
+  "lo": 0,
+  "hi": 1,
+  "desc": "NaOCl dosing pump",
+  "states": [
+   0,
+   1
+  ]
+ },
+ {
+  "tag": "P203",
+  "addr": 16,
+  "kind": "actuator",
+  "stage": "chemical dosing",
+  "unit": "state",
+  "lo": 0,
+  "hi": 1,
+  "desc": "HCl dosing pump",
+  "states": [
+   0,
+   1
+  ]
+ },
+ {
+  "tag": "DPIT301",
+  "addr": 20,
+  "kind": "sensor",
+  "stage": "ultrafiltration",
+  "unit": "kPa",
+  "lo": 0.0,
+  "hi": 40.0,
+  "desc": "UF differential pressure",
+  "states": null
+ },
+ {
+  "tag": "LIT301",
+  "addr": 21,
+  "kind": "sensor",
+  "stage": "ultrafiltration",
+  "unit": "mm",
+  "lo": 250,
+  "hi": 1100,
+  "desc": "UF feed tank level",
+  "states": null
+ },
+ {
+  "tag": "FIT301",
+  "addr": 22,
+  "kind": "sensor",
+  "stage": "ultrafiltration",
+  "unit": "m3/h",
+  "lo": 0.0,
+  "hi": 3.0,
+  "desc": "UF permeate flow",
+  "states": null
+ },
+ {
+  "tag": "MV301",
+  "addr": 25,
+  "kind": "actuator",
+  "stage": "ultrafiltration",
+  "unit": "state",
+  "lo": 0,
+  "hi": 2,
+  "desc": "UF backwash valve",
+  "states": [
+   0,
+   1,
+   2
+  ]
+ },
+ {
+  "tag": "P301",
+  "addr": 26,
+  "kind": "actuator",
+  "stage": "ultrafiltration",
+  "unit": "state",
+  "lo": 0,
+  "hi": 1,
+  "desc": "UF feed pump",
+  "states": [
+   0,
+   1
+  ]
+ },
+ {
+  "tag": "AIT401",
+  "addr": 30,
+  "kind": "sensor",
+  "stage": "dechlorination",
+  "unit": "ppm",
+  "lo": 0.0,
+  "hi": 1.0,
+  "desc": "Residual chlorine",
+  "states": null
+ },
+ {
+  "tag": "LIT401",
+  "addr": 31,
+  "kind": "sensor",
+  "stage": "dechlorination",
+  "unit": "mm",
+  "lo": 250,
+  "hi": 1100,
+  "desc": "RO feed tank level",
+  "states": null
+ },
+ {
+  "tag": "P401",
+  "addr": 35,
+  "kind": "actuator",
+  "stage": "dechlorination",
+  "unit": "state",
+  "lo": 0,
+  "hi": 1,
+  "desc": "UV dechlorinator / feed pump",
+  "states": [
+   0,
+   1
+  ]
+ },
+ {
+  "tag": "PIT501",
+  "addr": 40,
+  "kind": "sensor",
+  "stage": "reverse osmosis",
+  "unit": "kPa",
+  "lo": 0,
+  "hi": 300,
+  "desc": "RO feed pressure",
+  "states": null
+ },
+ {
+  "tag": "FIT501",
+  "addr": 41,
+  "kind": "sensor",
+  "stage": "reverse osmosis",
+  "unit": "m3/h",
+  "lo": 0.0,
+  "hi": 2.0,
+  "desc": "RO permeate flow",
+  "states": null
+ },
+ {
+  "tag": "AIT501",
+  "addr": 42,
+  "kind": "sensor",
+  "stage": "reverse osmosis",
+  "unit": "uS/cm",
+  "lo": 5,
+  "hi": 100,
+  "desc": "RO permeate conductivity",
+  "states": null
+ },
+ {
+  "tag": "P501",
+  "addr": 45,
+  "kind": "actuator",
+  "stage": "reverse osmosis",
+  "unit": "state",
+  "lo": 0,
+  "hi": 1,
+  "desc": "RO high-pressure pump",
+  "states": [
+   0,
+   1
+  ]
+ },
+ {
+  "tag": "MV501",
+  "addr": 46,
+  "kind": "actuator",
+  "stage": "reverse osmosis",
+  "unit": "state",
+  "lo": 0,
+  "hi": 2,
+  "desc": "RO permeate valve",
+  "states": [
+   0,
+   1,
+   2
+  ]
+ }
+]
