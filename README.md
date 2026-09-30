@@ -122,8 +122,10 @@ cannot see it), and names the most abnormal signal:
 python -m detect.lstm.train  --device-log data/run1/device_log.csv   # train on normal
 python -m detect.lstm.detect --device-log data/run1/device_log.csv   # score + report
 ```
-On `data/run1`: detects all five attack classes with 0% false positives on normal
-windows. Model in [`detect/lstm/model.py`](detect/lstm/model.py).
+On `data/run1` it catches false data injection, command injection and stealth in
+every window, with no false positives on windows of normal operation. It cannot
+see flooding or replay, which leave the process unchanged. Model in
+[`detect/lstm/model.py`](detect/lstm/model.py).
 
 ### Detection-in-depth coverage
 
@@ -131,8 +133,8 @@ windows. Model in [`detect/lstm/model.py`](detect/lstm/model.py).
 |---|---|---|---|
 | false data injection | ✅ | | ✅ |
 | command injection | ✅ | | ✅ |
-| replay | ✅ | | ✅ |
-| flooding / DoS | | ✅ | (partial) |
+| replay | ✅ | | |
+| flooding / DoS | | ✅ | |
 | stealth manipulation | | | ✅ |
 
 Every attack is covered by at least one layer — the point of the layered design.
@@ -146,10 +148,11 @@ per-class recall, detection latency) and writes plots + JSON:
 python -m eval.evaluate     # -> eval/results/{ablation.png, per_class_recall.png, results.json}
 ```
 
-Headline result on `data/run1` (our simulator): the **combined** system reaches
-**0.91 recall / 0.96 precision** and detects every attack within **1 second**,
-while no single layer exceeds 0.60 recall — quantifying the value of the layered
-design. Full numbers and methodology in [`docs/results.md`](docs/results.md).
+Headline result on `data/run1` (our simulator): no single layer flags more than
+60% of attack seconds, while the **combined** system flags **every attack second
+(recall 1.00) at 0.89 precision** and alerts in the first second of every attack.
+All of its false positives are LSTM alerts in the 9 seconds after an attack ends,
+where its 10-second window still overlaps the attack. Full numbers and methodology in [`docs/results.md`](docs/results.md).
 These are simulator results; see the external validation below for how the LSTM
 layer holds up on real data.
 

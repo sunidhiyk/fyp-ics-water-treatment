@@ -102,8 +102,15 @@ def _write(ctx, address: int, value: int) -> None:
 # ---------------------------------------------------------------------------
 # Actors
 # ---------------------------------------------------------------------------
-async def hmi_tick(client, ctx, sink, last_cmd: dict) -> list[int]:
-    """HMI reads the sensor block then writes any changed actuator commands."""
+async def hmi_tick(client, ctx, sink) -> list[int]:
+    """HMI reads the register block, then re-asserts any actuator whose register
+    does not hold the value its control logic wants.
+
+    Comparing against the register (not against the HMI's own last command) is
+    what a PLC scan cycle does: outputs are re-applied every cycle. It also means
+    that once an attacker stops overriding an actuator, the next cycle restores
+    it, so post-attack data really is normal operation.
+    """
     # One block read (SCADA-style poll) — logged as a single read transaction.
     regs = await logged_read(client, HMI, 0, REGISTER_COUNT, sink) or \
         [_read(ctx, a) for a in range(REGISTER_COUNT)]
@@ -124,10 +131,9 @@ async def hmi_tick(client, ctx, sink, last_cmd: dict) -> list[int]:
         "P501": 1 if sv("LIT401") > 400 else 0,
     }
     for tag, val in cmds.items():
-        if last_cmd.get(tag) != val:                      # write only on change
-            await logged_write(client, HMI, BY_TAG[tag].address,
-                               BY_TAG[tag].to_register(val), sink)
-            last_cmd[tag] = val
+        p = BY_TAG[tag]
+        if regs[p.address] != p.to_register(val):         # output differs -> re-assert
+            await logged_write(client, HMI, p.address, p.to_register(val), sink)
     return regs
 
 
@@ -218,7 +224,6 @@ async def generate(out_dir: str, scenarios: list[str], speedup: float, seed: int
     net_log: list[Transaction] = []
     device_rows: list[dict] = []
     replay_buf: list[tuple[int, int]] = []
-    last_cmd: dict[str, int] = {}
 
     wall = "max speed" if speedup <= 0 else f"~{duration/speedup:.0f}s wall"
     print(f"Generating {duration} sim-seconds "
@@ -240,7 +245,7 @@ async def generate(out_dir: str, scenarios: list[str], speedup: float, seed: int
             await attack_pre_read(label, ctx, attacker, net_log, replay_buf)
             # 4. legitimate HMI poll + control
             before = len(net_log)
-            await hmi_tick(hmi, ctx, net_log, last_cmd)
+            await hmi_tick(hmi, ctx, net_log)
             # remember a legit actuator write for later replay
             for t in net_log[before:]:
                 if t.is_write and t.src_ip == HMI.ip:

@@ -21,24 +21,24 @@
       "tn": 285
     },
     "LSTM": {
-      "precision": 0.9285714285714286,
-      "recall": 0.52,
-      "fpr": 0.031578947368421054,
-      "f1": 0.6666666666666666,
-      "tp": 117,
-      "fp": 9,
-      "fn": 108,
-      "tn": 276
+      "precision": 0.8333333333333334,
+      "recall": 0.6,
+      "fpr": 0.09473684210526316,
+      "f1": 0.6976744186046512,
+      "tp": 135,
+      "fp": 27,
+      "fn": 90,
+      "tn": 258
     },
     "Combined": {
-      "precision": 0.9579439252336449,
-      "recall": 0.9111111111111111,
-      "fpr": 0.031578947368421054,
-      "f1": 0.9339407744874716,
-      "tp": 205,
-      "fp": 9,
-      "fn": 20,
-      "tn": 276
+      "precision": 0.8928571428571429,
+      "recall": 1.0,
+      "fpr": 0.09473684210526316,
+      "f1": 0.9433962264150945,
+      "tp": 225,
+      "fp": 27,
+      "fn": 0,
+      "tn": 258
     }
   },
   "per_class_recall": {
@@ -58,17 +58,17 @@
     },
     "LSTM": {
       "false_data_injection": 1.0,
-      "command_injection": 0.8666666666666667,
-      "flooding_dos": 0.08888888888888889,
-      "replay": 0.08888888888888889,
-      "stealth_manipulation": 0.5555555555555556
+      "command_injection": 1.0,
+      "flooding_dos": 0.0,
+      "replay": 0.0,
+      "stealth_manipulation": 1.0
     },
     "Combined": {
       "false_data_injection": 1.0,
       "command_injection": 1.0,
       "flooding_dos": 1.0,
       "replay": 1.0,
-      "stealth_manipulation": 0.5555555555555556
+      "stealth_manipulation": 1.0
     }
   },
   "latency": {
@@ -88,9 +88,9 @@
     },
     "LSTM": {
       "false_data_injection": 0,
-      "command_injection": 1,
-      "flooding_dos": 5,
-      "replay": 0,
+      "command_injection": 0,
+      "flooding_dos": null,
+      "replay": null,
       "stealth_manipulation": 0
     },
     "Combined": {
