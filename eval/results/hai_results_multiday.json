@@ -1,0 +1,111 @@
+{
+  "dataset": "HAI 22.04",
+  "train_files": [
+    "train1.csv",
+    "train2.csv",
+    "train3.csv"
+  ],
+  "calibration": "held-out normal day (train4.csv)",
+  "test_file": "test1.csv",
+  "train_seconds": 421201,
+  "test_seconds": 86400,
+  "attack_seconds": 885,
+  "features": 69,
+  "window": 10,
+  "threshold_pct": 99.9,
+  "scores": {
+    "per-feature std (ours)": {
+      "roc_auc": 0.4649161634195295,
+      "pr_auc": 0.009895405777453788,
+      "attack_base_rate": 0.01097336528110567,
+      "threshold": 592.1768798828125,
+      "at_threshold": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "fpr": 0.001872593424856337,
+        "tp": 0,
+        "fp": 160,
+        "fn": 948,
+        "tn": 85283
+      },
+      "episodes": {
+        "episodes": 7,
+        "detected": 0,
+        "median_latency_s": null,
+        "latencies_s": []
+      },
+      "oracle_best": {
+        "threshold": 15.566149711608887,
+        "precision": 0.012844575737298232,
+        "recall": 0.830168776371308,
+        "f1": 0.025297738632893484,
+        "fpr": 0.7078871294313168,
+        "tp": 787,
+        "fp": 60484,
+        "fn": 161,
+        "tn": 24959,
+        "episodes": {
+          "episodes": 7,
+          "detected": 6,
+          "median_latency_s": 0.0,
+          "latencies_s": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            42
+          ]
+        }
+      }
+    },
+    "mean MSE": {
+      "roc_auc": 0.5863200321916192,
+      "pr_auc": 0.054511633290239524,
+      "attack_base_rate": 0.01097336528110567,
+      "threshold": 0.5332120656967163,
+      "at_threshold": {
+        "precision": 0.25903614457831325,
+        "recall": 0.04535864978902954,
+        "f1": 0.07719928186714542,
+        "fpr": 0.001439556195358309,
+        "tp": 43,
+        "fp": 123,
+        "fn": 905,
+        "tn": 85320
+      },
+      "episodes": {
+        "episodes": 7,
+        "detected": 2,
+        "median_latency_s": 45.0,
+        "latencies_s": [
+          5,
+          85
+        ]
+      },
+      "oracle_best": {
+        "threshold": 0.45083776116371155,
+        "precision": 0.09534368070953436,
+        "recall": 0.09071729957805907,
+        "f1": 0.09297297297297298,
+        "fpr": 0.009550226466767318,
+        "tp": 86,
+        "fp": 816,
+        "fn": 862,
+        "tn": 84627,
+        "episodes": {
+          "episodes": 7,
+          "detected": 4,
+          "median_latency_s": 73.0,
+          "latencies_s": [
+            191,
+            4,
+            63,
+            83
+          ]
+        }
+      }
+    }
+  }
+}

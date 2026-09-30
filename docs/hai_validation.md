@@ -7,104 +7,150 @@ ICS dataset, National Security Research Institute, South Korea) — a real
 hardware-in-the-loop testbed with boiler, turbine, water-treatment and HIL
 processes, sampled at 1 Hz.
 
-**Bottom line:** the approach transfers only weakly. The LSTM ranks real attacks
-above normal operation clearly better than chance (ROC-AUC 0.74), but it does not
-reach usable alarm performance on HAI. Even with an ideally calibrated threshold,
-F1 is at most ~0.10. The strong simulator results should therefore be read as
-optimistic, and this is reported as a limitation.
+**Bottom line:** the LSTM layer does not generalise well to HAI. We ran two
+pre-planned configurations:
+
+1. **Trained on one day**, threshold from the training data: the score ranks
+   attacks above normal better than chance (ROC-AUC 0.74), but the threshold
+   flags ~94% of the test day, so it is unusable as an alarm.
+2. **Trained on three days**, threshold from a separate held-out normal day: false
+   alarms drop to ~0.1% of the day, but the score's ability to separate attacks
+   from normal falls (ROC-AUC 0.59 with plain MSE, 0.47 with our per-feature
+   score). The best deployable result is plain MSE, which detects **2 of 7**
+   attack episodes at 26% precision with a median delay of 45 s.
+
+The strong simulator results should therefore be read as optimistic, and this is
+reported as a limitation. The main cause is that HAI's test day runs in operating
+modes that do not appear in any of the training days.
 
 ## Setup
 
-| | |
-|---|---|
-| Training data | `hai-22.04/train1.csv` — 93,601 s (~26 h), normal operation only |
-| Test data | `hai-22.04/test1.csv` — 86,400 s (24 h), 885 s of labelled attacks (~1%), 7 attack episodes |
-| Features | 60 informative sensors/actuators (26 constant columns dropped) |
-| Model | Same LSTM autoencoder as our detector (window 10 s, hidden 64, latent 32, 15 epochs) |
-| Protocol | Unsupervised: train on normal only; threshold = 99.9th percentile of training scores |
+| | Round 1 | Round 2 |
+|---|---|---|
+| Training data (normal only) | `train1` (~26 h) | `train1`, `train2`, `train3` |
+| Threshold set on | training windows | `train4` — a held-out normal day, not trained on |
+| Test data | `test1` — 24 h, 885 s of labelled attacks (~1%), 7 episodes | same |
+| Features | 60 informative sensors/actuators (26 constant columns dropped) | same |
+| Model | LSTM autoencoder, window 10 s, hidden 64, latent 32, 15 epochs, inputs clipped to ±5σ | same |
+| Threshold rule | 99.9th percentile of normal scores | same |
 
-Reproduce (after downloading the two CSVs into `data/public/hai/`):
+Only the training days and the calibration source changed between rounds; every
+other setting was held fixed, so the difference between rounds comes from those
+two changes.
+
+Reproduce (after downloading the CSVs into `data/public/hai/`):
 
 ```bash
+# Round 1
 python -m eval.hai_validate
+# Round 2
+python -m eval.hai_validate \
+  --train data/public/hai/train1.csv,data/public/hai/train2.csv,data/public/hai/train3.csv \
+  --calib data/public/hai/train4.csv --tag multiday
 ```
 
 ## Results
 
 Window-level, contamination-aware labels (a window is an attack window if any of
 its seconds is an attack). Random-guess PR-AUC equals the attack base rate, 0.011.
+"Deployable" means the threshold was set without looking at test labels.
 
-| Metric | Per-feature std score (ours) | Plain mean MSE |
+### Plain mean-MSE score
+
+| | Round 1 (1 day) | Round 2 (3 days + held-out threshold) |
 |---|---|---|
-| ROC-AUC | 0.742 | 0.742 |
-| PR-AUC | 0.044 (4× random) | 0.081 (7× random) |
-| **At the train-derived threshold** | | |
-| Precision / Recall | 0.012 / 0.998 | 0.012 / 0.978 |
-| False-positive rate | 0.940 | 0.914 |
-| **At the oracle-best threshold** *(upper bound, uses test labels)* | | |
-| Precision / Recall | 0.031 / 0.369 | 0.430 / 0.058 |
-| F1 | 0.057 | 0.102 |
-| Attack episodes detected | 5 / 7 | 2 / 7 |
+| ROC-AUC | 0.742 | 0.586 |
+| PR-AUC | 0.081 | 0.055 |
+| Deployable precision / recall | 0.012 / 0.978 | 0.259 / 0.045 |
+| Deployable F1 | 0.023 | 0.077 |
+| False-positive rate | 0.914 | **0.001** |
+| Attack episodes detected | 7/7 *(meaningless — flags nearly everything)* | **2/7**, median delay 45 s |
+| Best F1 with an oracle threshold *(uses test labels)* | 0.102 | 0.093 |
 
-At the deployable (train-derived) threshold the detector flags ~94% of the test
-day, so its "7/7 episodes detected" is not meaningful and is not claimed as a
-result. The oracle rows are **not** achievable in practice — they show the best
-the score could do if the threshold were perfectly calibrated, i.e. an upper
-bound on the score's separating power.
+### Our per-feature standardised score
 
-![HAI timeline](../eval/results/hai_timeline.png)
+| | Round 1 (1 day) | Round 2 (3 days + held-out threshold) |
+|---|---|---|
+| ROC-AUC | 0.742 | 0.465 |
+| PR-AUC | 0.044 | 0.010 (≈ random) |
+| Deployable precision / recall | 0.012 / 0.998 | 0.000 / 0.000 |
+| False-positive rate | 0.940 | 0.002 |
+| Attack episodes detected | 7/7 *(meaningless)* | 0/7 |
+| Best F1 with an oracle threshold *(uses test labels)* | 0.057 | 0.025 |
+
+The oracle rows are not achievable in practice; they are an upper bound on how
+well each score could separate the classes if its threshold were perfectly set.
+
+Round 1 timeline:
+
+![HAI timeline, round 1](../eval/results/hai_timeline.png)
+
+Round 2 timeline (our per-feature score):
+
+![HAI timeline, round 2](../eval/results/hai_timeline_multiday.png)
 
 ## Diagnosis
 
-1. **A near-constant sensor broke the first run.** Without safeguards, ROC-AUC
-   was 0.47 (worse than random). `P1_PCV02Z` has a training std of 0.0037, but on
-   the test day its normal values sit a median of ~127σ from the training mean;
-   standardisation turned this small drift into an enormous error that dominated
-   every window. Clipping standardised inputs to ±5σ — a conventional outlier
-   bound, fixed before re-running and not tuned on test labels — raised ROC-AUC
-   to 0.74.
-2. **Operating-mode drift dominates the score.** The timeline shows the score
-   moving in large steps (e.g. hours 7.5–9.5) that contain no attacks: the plant
-   runs in operating regimes on the test day that never appeared in the single
-   training day. The alarm threshold, learned on training data, sits below almost
-   the entire test day.
-3. **HAI attacks are short and subtle.** Most attack episodes are brief blips on
-   top of this drifting baseline; a few produce clear spikes (e.g. ~16.7 h), most
-   do not stand out.
-4. **Scoring choice is data-dependent.** Our per-feature "worst-signal" score was
-   what let the LSTM catch the single-signal stealth attack in our simulator, but
-   on HAI's 60 noisy real sensors it is more sensitive to noise, and plain MSE has
-   the better PR-AUC (0.081 vs 0.044).
+1. **A near-constant sensor broke the very first attempt.** Without safeguards,
+   Round 1 scored ROC-AUC 0.47. `P1_PCV02Z` has a training std of 0.0037, but on
+   the test day its normal values sit a median of ~127σ from the training mean,
+   and that one sensor dominated every window. Clipping standardised inputs to
+   ±5σ — a conventional outlier bound, set before re-running — raised ROC-AUC to
+   0.74. All reported results use this clipping.
+2. **The held-out threshold fixed the false alarms.** Setting the threshold on a
+   separate normal day instead of the training data cut the false-positive rate
+   from ~0.91 to ~0.001. This part of the plan worked as intended.
+3. **More training days did not cover the test day's operating modes.** The
+   Round 2 timeline shows the score sitting high for the first ~16.5 hours and
+   then dropping about 50× at ~16.8 h, with no attack causing it. The plant is
+   running in a mode that none of the three training days (or the calibration
+   day) contain. The score tracks these mode changes rather than the attacks,
+   which are short events on top.
+4. **Broader training data made attacks stand out less.** Scaling statistics
+   computed over three days are wider, so a given deviation is smaller in
+   standardised units, and the model learns to reconstruct more varied behaviour.
+   Both reduce how much attacks stand out. ROC-AUC does not depend on the
+   threshold, so its drop from 0.74 is caused by the training change, not the
+   calibration change.
+5. **Our per-feature score is fragile on real data.** It divides each sensor's
+   reconstruction error by that error's spread during training. For sensors the
+   model reconstructs almost perfectly, the spread is tiny, so a mode change in
+   one of them produces a huge score — undoing the input clipping. This is why it
+   collapses to chance in Round 2 while plain MSE degrades less. The same score
+   worked on our simulator, where the operating conditions never change and the
+   stealth attack affects a single signal; on HAI it is the wrong choice.
 
 ## Methodological note
 
-We stopped after diagnosing the failure rather than continuing to adjust the model
-and re-checking against `test1`. Repeatedly tuning against the labelled test file
-would fit the model to that file and invalidate the external validation. The
-results above come from one model configuration; the only change between runs was
-the input clipping described in point 1, which was motivated by the feature
-distributions, set in advance, and applied once.
+Both rounds were planned before they were run, and each was run once. Between
+them only the training days and the threshold source changed. We stopped after
+Round 2 rather than continuing to adjust settings and re-checking against
+`test1`: repeatedly tuning against the labelled test file would fit the model to
+that file and make the validation meaningless.
 
 ## What would improve it (future work)
 
-These are principled next steps that do not use test labels for tuning:
-
-- **Train on more operating conditions.** HAI provides six training files from
-  different days. Training on several of them exposes the model to the operating
-  regimes it currently mistakes for attacks.
-- **Calibrate the threshold on a held-out normal day** (e.g. `train2`), not on
-  the training data itself, so the threshold reflects day-to-day variation.
-- **Longer windows / trend removal.** HAI attacks and regime changes unfold over
-  minutes; a 10 s window cannot tell a slow regime shift from a fault. Scoring
-  deviations relative to a rolling baseline would target sudden changes.
-- **HAI's official metric (eTaPR).** Reporting it alongside ROC/PR-AUC would allow
-  direct comparison with published HAI results.
+- **Cover more operating modes.** Train on all six HAI training days (`train5`
+  and `train6` are unused) and check whether the test day's early operating mode
+  appears in any of them.
+- **Mode-aware normalisation.** Detect the plant's operating mode and normalise
+  or score within each mode, so a mode change is not mistaken for an attack.
+- **Score relative to a rolling baseline.** Attacks are short compared with mode
+  changes; scoring the deviation from the last few minutes would target sudden
+  changes and ignore slow shifts.
+- **Use plain MSE (or a top-k average) rather than the worst-feature score** on
+  real multi-sensor data.
+- **Confirm on `test2`,** an independent test day, before trusting any
+  improvement.
+- **Report HAI's official metric (eTaPR)** to compare with published results.
 
 ## Implication for the project
 
 The simulator evaluation shows the detection-in-depth architecture works as
 designed when the attacks and operating conditions match what the models were
-built for. The HAI validation shows that the LSTM layer, as currently trained,
-does not generalise to a real testbed with non-stationary operation and subtle
-attacks. The DPI rule engine and NetFlow monitor were not evaluated on HAI
-because HAI provides process data only, not network packets.
+built for. The HAI validation shows that the LSTM layer, as currently designed,
+does not handle a real plant whose operating mode changes from day to day: it
+either raises constant false alarms (threshold from training) or misses most
+attacks (threshold from a held-out day). Handling operating-mode changes is the
+main open problem for this layer. The DPI rule engine and NetFlow monitor were
+not evaluated on HAI because HAI provides process data only, not network packets.

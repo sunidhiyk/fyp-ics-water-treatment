@@ -109,8 +109,12 @@ def episode_detection(scores: np.ndarray, thr: float, y: np.ndarray,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Validate the LSTM on the public HAI dataset")
-    ap.add_argument("--train", default="data/public/hai/train1.csv")
+    ap.add_argument("--train", default="data/public/hai/train1.csv",
+                    help="comma-separated normal-only training files")
+    ap.add_argument("--calib", default="",
+                    help="optional held-out normal file used only to set the threshold")
     ap.add_argument("--test", default="data/public/hai/test1.csv")
+    ap.add_argument("--tag", default="", help="suffix for output file names")
     ap.add_argument("--window", type=int, default=10)
     ap.add_argument("--stride", type=int, default=5, help="training-window stride")
     ap.add_argument("--hidden", type=int, default=64)
@@ -126,31 +130,42 @@ def main() -> None:
     torch.manual_seed(args.seed); np.random.seed(args.seed)
     t0 = time.time()
 
-    xtr, ytr, cols = load_hai(args.train)
+    # One or more normal-only training days (comma-separated).
+    train_paths = [p.strip() for p in args.train.split(",") if p.strip()]
+    days = [load_hai(p) for p in train_paths]
+    cols = days[0][2]
+    for (x, y, c), p in zip(days, train_paths):
+        assert y.sum() == 0, f"{p} should be normal-only"
+        assert c == cols, f"{p} has different columns"
     xte, yte, _ = load_hai(args.test)
-    assert ytr.sum() == 0, "HAI training file should be normal-only"
+    xtr = np.concatenate([d[0] for d in days])
 
     # drop features that never vary in normal operation (no information)
     keep = xtr.std(axis=0) > 1e-6
-    xtr, xte = xtr[:, keep], xte[:, keep]
     feats = [c for c, k in zip(cols, keep) if k]
-    mean, std = xtr.mean(0), xtr.std(0)
-    xtr_s = ((xtr - mean) / std).astype(np.float32)
-    xte_s = ((xte - mean) / std).astype(np.float32)
-    if args.clip > 0:
-        # Robustness guard: a sensor that is near-constant in training (tiny std)
-        # turns any small day-to-day drift into an enormous z-score, which then
-        # dominates every window's error. Clipping bounds each signal's influence.
-        # Chosen a priori (a conventional outlier bound), not tuned on test labels.
-        xtr_s = np.clip(xtr_s, -args.clip, args.clip)
-        xte_s = np.clip(xte_s, -args.clip, args.clip)
-    print(f"HAI: train {len(xtr):,}s normal | test {len(xte):,}s, "
-          f"{int(yte.sum())} attack s | {len(feats)} informative features "
-          f"(dropped {int((~keep).sum())} constant)")
+    mean, std = xtr[:, keep].mean(0), xtr[:, keep].std(0)
+
+    def prep(x: np.ndarray) -> np.ndarray:
+        s = ((x[:, keep] - mean) / std).astype(np.float32)
+        if args.clip > 0:
+            # Robustness guard: a sensor that is near-constant in training (tiny
+            # std) turns any small day-to-day drift into an enormous z-score, which
+            # then dominates every window's error. Clipping bounds each signal's
+            # influence. Chosen a priori, not tuned on test labels.
+            s = np.clip(s, -args.clip, args.clip)
+        return s
+
+    xte_s = prep(xte)
+    print(f"HAI: train {len(train_paths)} day(s), {len(xtr):,}s normal | "
+          f"test {len(xte):,}s, {int(yte.sum())} attack s | {len(feats)} "
+          f"informative features (dropped {int((~keep).sum())} constant)")
 
     # ---- train on normal ----
-    train_w = sliding_window_view(xtr_s, args.window, axis=0)[::args.stride]
-    train_w = np.ascontiguousarray(train_w.transpose(0, 2, 1))   # (M, W, F)
+    # windows are built per day so none straddles the gap between two recordings
+    train_w = np.concatenate([
+        sliding_window_view(prep(d[0]), args.window, axis=0)[::args.stride]
+        .transpose(0, 2, 1) for d in days])
+    train_w = np.ascontiguousarray(train_w)                      # (M, W, F)
     tx = torch.from_numpy(train_w)
     model = LSTMAutoencoder(len(feats), hidden=args.hidden, latent=args.latent)
     opt = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -168,21 +183,36 @@ def main() -> None:
             total += loss.item() * len(b)
         print(f"  epoch {ep+1:2}/{args.epochs}  MSE {total/len(tx):.4f}")
 
-    # ---- normal statistics + threshold (training data only) ----
+    # ---- normal error statistics (training data) ----
     pf_tr = per_feature_errors(model, tx)
     mu, sigma = pf_tr.mean(0), pf_tr.std(0)
     sigma[sigma < 1e-6] = 1e-6
-    tr_max = standardized_scores(pf_tr, mu, sigma).numpy()
-    tr_mean = pf_tr.mean(dim=1).numpy()
-    thr_max = float(np.percentile(tr_max, args.threshold_pct))
-    thr_mean = float(np.percentile(tr_mean, args.threshold_pct))
+
+    # ---- alarm threshold ----
+    if args.calib:
+        # Held-out normal day, never used for training: the threshold then reflects
+        # how much normal behaviour varies from one day to the next.
+        xc, yc, cc = load_hai(args.calib)
+        assert yc.sum() == 0 and cc == cols, "calibration day must be normal-only"
+        c_max, c_mean = score_windows(model, prep(xc), args.window, mu, sigma)
+        thr_source = f"held-out normal day ({os.path.basename(args.calib)})"
+    else:
+        c_max = standardized_scores(pf_tr, mu, sigma).numpy()
+        c_mean = pf_tr.mean(dim=1).numpy()
+        thr_source = "training windows"
+    thr_max = float(np.percentile(c_max, args.threshold_pct))
+    thr_mean = float(np.percentile(c_mean, args.threshold_pct))
+    print(f"threshold: {args.threshold_pct}th percentile of scores on {thr_source}")
 
     # ---- score the test set ----
     s_max, s_mean = score_windows(model, xte_s, args.window, mu, sigma)
     # contamination-aware window label: attack if any row in the window is attack
     wlabel = sliding_window_view(yte, args.window).max(axis=1)
 
-    results = {"dataset": "HAI 22.04 (train1 -> test1)",
+    results = {"dataset": "HAI 22.04",
+               "train_files": [os.path.basename(p) for p in train_paths],
+               "calibration": thr_source,
+               "test_file": os.path.basename(args.test),
                "train_seconds": int(len(xtr)), "test_seconds": int(len(xte)),
                "attack_seconds": int(yte.sum()), "features": len(feats),
                "window": args.window, "threshold_pct": args.threshold_pct,
@@ -228,7 +258,9 @@ def main() -> None:
     print(f"\n(runtime {time.time()-t0:.0f}s)")
 
     os.makedirs(args.out_dir, exist_ok=True)
-    with open(os.path.join(args.out_dir, "hai_results.json"), "w", encoding="utf-8") as fh:
+    sfx = f"_{args.tag}" if args.tag else ""
+    with open(os.path.join(args.out_dir, f"hai_results{sfx}.json"), "w",
+              encoding="utf-8") as fh:
         json.dump(results, fh, indent=2)
 
     # ---- timeline plot ----
@@ -243,11 +275,12 @@ def main() -> None:
         ax.axvspan(s / 3600, (e + 1) / 3600, color="#f85149", alpha=0.18)
     ax.set_yscale("log")
     ax.set_xlabel("time in test set (hours)"); ax.set_ylabel("score (log)")
-    ax.set_title("HAI test1 - LSTM anomaly score vs real attacks (shaded)")
+    ax.set_title(f"HAI {os.path.basename(args.test)} - LSTM score vs real attacks "
+                 f"(shaded); trained on {len(train_paths)} day(s)")
     ax.legend(loc="upper right", fontsize=8); fig.tight_layout()
-    p = os.path.join(args.out_dir, "hai_timeline.png")
+    p = os.path.join(args.out_dir, f"hai_timeline{sfx}.png")
     fig.savefig(p, dpi=130); plt.close(fig)
-    print("saved", p, "and hai_results.json")
+    print("saved", p, f"and hai_results{sfx}.json")
 
 
 if __name__ == "__main__":

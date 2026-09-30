@@ -163,12 +163,14 @@ attacks (~1% of the time):
 python -m eval.hai_validate     # needs data/public/hai/{train1,test1}.csv
 ```
 
-The approach transfers only **weakly**: ROC-AUC **0.74** (clearly above chance),
-but PR-AUC is 0.04–0.08 and even an oracle-calibrated threshold gives F1 ≤ 0.10.
-The main cause is operating-mode drift between HAI's training and test days,
-which the model mistakes for attacks. The simulator results should therefore be
-read as optimistic. Full results, diagnosis, and future work in
-[`docs/hai_validation.md`](docs/hai_validation.md).
+The approach does **not** generalise well. Trained on one day, the score ranks
+attacks above normal (ROC-AUC **0.74**) but its threshold flags ~94% of the test
+day. Trained on three days with the threshold set on a held-out normal day, false
+alarms fall to ~0.1%, but the best deployable detector (plain MSE) catches only
+**2 of 7** attack episodes. The cause is that HAI's test day runs in operating
+modes absent from every training day, which the model mistakes for attacks. The
+simulator results should therefore be read as optimistic. Full results,
+diagnosis, and future work in [`docs/hai_validation.md`](docs/hai_validation.md).
 
 ## Web dashboard demo
 
